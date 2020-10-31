@@ -9,6 +9,7 @@ import sounddevice as sd
 import matplotlib.pyplot as plt
 import soundfile as sf
 import peakutils
+from math import sqrt
 
 frequencies = {
     "0": [941, 1336],
@@ -73,13 +74,15 @@ class Wave():
 #         plt.grid()
 #         plt.title('Filtrado no tempo')
 
-    def play(self):
-        sd.play(self.yFiltrado)
-        sd.wait()
+    def play(self, times):
+        print(f"'{self.char}': {self.f1} Hz - {self.f2} Hz")
+        for i in range(times):
+            sd.play(self.y)
+            sd.wait()
 
     def match(self, array):
-        #         def dist([])
-        pass
+        f1, f2 = array
+        return sqrt((f1 - self.f1)**2 + (f2 - self.f2)**2)
 
 
 def shift(sound):
@@ -90,13 +93,24 @@ def shift(sound):
     return sound
 
 
-def calc_peaks(sound, thres=0.8, min_dist=50):
+def calc_peaks(sound, min_dist=50,):
     yAudio = sound[:, 1]
     X, Y = calcFFT(yAudio, fs)
-    plt.figure("Fourier Audio", figsize=(9,3))
-    plt.plot(X, np.abs(Y))
-    index = peakutils.indexes(np.abs(Y), thres=thres, min_dist=min_dist)
-    return X[index]
+    for i in range(1, 10):
+        index = peakutils.indexes(
+            np.abs(Y), thres=0.1*(10-i), min_dist=min_dist)
+        # print(X[index])
+        if len(index) >= 4:
+            plt.figure("Fourier Audio", figsize=(9, 3))
+            plt.title(f"Melhor ajuste de threshold: {0.1*(10-i)}")
+            plt.plot(X, np.abs(Y))
+            plt.grid()
+            results = X[index]
+            return results[(len(index) % 2) + len(results)//2:].T
+
+
+def dist(x1, y1, x2, y2):
+    return sqrt((x1 - x2)**2 + (y1 - y2)**2)
 
 
 def record_audio(duration):  # duration in seconds
@@ -104,6 +118,18 @@ def record_audio(duration):  # duration in seconds
     sd.wait()
     print(f"recording shape: {myrecording.shape}")
     return shift(myrecording)
+
+
+def match_char(peaks):
+    x0, y0 = peaks
+    min = 1000
+    match = ''
+    for char, (x1, y1) in frequencies.items():
+        curr_dist = dist(x1, y1, x0, y0)
+        if curr_dist < min:
+            min = curr_dist
+            match = char
+    return match.upper()
 
 
 def generateSin(freq, time, fs):
